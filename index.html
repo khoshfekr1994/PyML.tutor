@@ -51,6 +51,15 @@
     .modal-box button:hover { background: #6d65c8; }
     .modal-note { font-size: 11px; color: #555; margin-top: 10px; text-align: center; }
 
+    /* ── FOOTER ── */
+    #app-footer {
+      text-align: center; padding: 7px 0;
+      font-size: 11px; color: #444;
+      border-top: 1px solid #1e1e3a;
+      background: #0f0f1a; flex-shrink: 0;
+      letter-spacing: 0.3px;
+    }
+
     /* ── LAYOUT ── */
     #app { display: flex; flex: 1; overflow: hidden; }
 
@@ -340,6 +349,9 @@ print('Hello, ML world!')</textarea>
   </div>
 </div>
 
+</div>
+<div id="app-footer">Written by Hamid Khoshfekr Rudsari</div>
+
 <script>
 const SYSTEM_PROMPT = `You are PyML.tutor, an expert AI/ML instructor teaching Python from absolute beginner to industry-level professional. You remember everything taught from the start of this conversation and maintain full curriculum continuity.
 
@@ -576,6 +588,7 @@ async function sendMsg(text) {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-client-side-api-key-flag": "true",
         "anthropic-dangerous-client-side-api-key-flag": "true"
       },
       body: JSON.stringify({
