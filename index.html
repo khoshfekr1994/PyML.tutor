@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PyML.tutor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f0f1a;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── API KEY MODAL ── */
+    #key-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    #key-modal.hidden { display: none; }
+    .modal-box {
+      background: #111127;
+      border: 1px solid #2d2d5e;
+      border-radius: 14px;
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .modal-box h2 { font-size: 20px; color: #a78bfa; margin-bottom: 6px; }
+    .modal-box p  { font-size: 13px; color: #888; line-height: 1.6; margin-bottom: 20px; }
+    .modal-box a  { color: #7F77DD; }
+    .modal-box input {
+      width: 100%; padding: 10px 12px;
+      background: #0f0f1a; border: 1px solid #2d2d5e;
+      border-radius: 8px; color: #e2e8f0; font-size: 14px;
+      outline: none; margin-bottom: 12px;
+    }
+    .modal-box input:focus { border-color: #7F77DD; }
+    .modal-box button {
+      width: 100%; padding: 10px;
+      background: #7F77DD; border: none; border-radius: 8px;
+      color: #fff; font-size: 14px; font-weight: 500; cursor: pointer;
+    }
+    .modal-box button:hover { background: #6d65c8; }
+    .modal-note { font-size: 11px; color: #555; margin-top: 10px; text-align: center; }
+
+    /* ── LAYOUT ── */
+    #app { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: 220px; min-width: 220px;
+      background: #111127;
+      border-right: 1px solid #1e1e3a;
+      display: flex; flex-direction: column;
+      overflow-y: auto;
+      transition: all 0.2s;
+    }
+    #sidebar.collapsed { width: 0; min-width: 0; overflow: hidden; }
+
+    .sidebar-section-label {
+      padding: 10px 12px 4px;
+      font-size: 10px; font-weight: 600;
+      color: #7F77DD; letter-spacing: 1px; text-transform: uppercase;
+    }
+    .progress-bar-wrap { height: 4px; background: #1e1e3a; border-radius: 2px; margin: 4px 12px 2px; }
+    .progress-bar-fill { height: 100%; background: #7F77DD; border-radius: 2px; transition: width 0.4s; }
+    .progress-label { padding: 2px 12px 8px; font-size: 11px; color: #888; }
+
+    .phase-label {
+      padding: 6px 12px 3px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase;
+    }
+    .mod-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 12px;
+      border-left: 3px solid transparent;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .mod-item:hover { background: #1a1a30; }
+    .mod-item.active { background: #1e1e3a; }
+    .mod-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px; flex-shrink: 0;
+      border: 1.5px solid #2d2d5e;
+      background: #1e1e3a; color: #888;
+    }
+    .mod-name { font-size: 12px; color: #aaa; }
+    .mod-item.active .mod-name { color: #e2e8f0; font-weight: 500; }
+    .mod-item.done .mod-dot { color: #fff; }
+    .mod-item.done .mod-name { color: #666; }
+
+    .sidebar-footer {
+      margin-top: auto; padding: 10px 12px;
+      border-top: 1px solid #1e1e3a;
+    }
+    .sidebar-footer button {
+      width: 100%; background: none;
+      border: 1px solid #2d2d5e; border-radius: 6px;
+      color: #666; font-size: 11px; padding: 5px 10px; cursor: pointer;
+    }
+    .sidebar-footer button:hover { color: #e04040; border-color: #e04040; }
+
+    /* ── MAIN ── */
+    #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    #header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e1e3a;
+      background: #0f0f1a;
+      flex-shrink: 0;
+    }
+    #header .logo { font-size: 15px; font-weight: 600; color: #a78bfa; }
+    #header .cur-mod { font-size: 11px; color: #555; margin-left: 2px; }
+    #toggle-sidebar {
+      background: none; border: none; color: #888;
+      cursor: pointer; font-size: 20px; line-height: 1; padding: 0;
+    }
+    #toggle-editor {
+      margin-left: auto;
+      background: #1e1e3a; border: none; border-radius: 6px;
+      color: #aaa; font-size: 11px; padding: 5px 10px; cursor: pointer;
+    }
+    #toggle-editor.active { background: #1D9E75; color: #fff; }
+    #toggle-key {
+      background: none; border: 1px solid #2d2d5e; border-radius: 6px;
+      color: #666; font-size: 11px; padding: 5px 10px; cursor: pointer; margin-left: 6px;
+    }
+
+    /* ── CHAT ── */
+    #chat-area {
+      flex: 1; overflow-y: auto;
+      padding: 16px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .welcome {
+      text-align: center; margin-top: 60px; color: #555;
+    }
+    .welcome .emoji { font-size: 40px; margin-bottom: 12px; }
+    .welcome h3 { font-size: 16px; color: #a78bfa; font-weight: 500; margin-bottom: 8px; }
+    .welcome p { font-size: 13px; color: #666; line-height: 1.8; max-width: 340px; margin: 0 auto; }
+    .welcome b { color: #7F77DD; }
+
+    .msg-wrap { display: flex; flex-direction: column; }
+    .msg-wrap.user { align-items: flex-end; }
+    .msg-wrap.assistant { align-items: flex-start; }
+    .msg-label { font-size: 10px; color: #555; margin-bottom: 3px; padding: 0 4px; }
+    .bubble {
+      max-width: 88%; padding: 10px 14px;
+      font-size: 14px; line-height: 1.75;
+    }
+    .bubble.user {
+      background: #3730a3; border-radius: 16px 16px 4px 16px; color: #e2e8f0;
+    }
+    .bubble.assistant {
+      background: #1e1e3a; border-radius: 16px 16px 16px 4px; color: #e2e8f0;
+    }
+
+    /* code blocks inside chat */
+    .code-block { margin: 10px 0; border-radius: 8px; overflow: hidden; border: 1px solid #2d2d2d; }
+    .code-header {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #1a1a2e; padding: 5px 12px;
+    }
+    .code-lang { font-size: 11px; color: #888; font-family: monospace; }
+    .copy-btn {
+      background: none; border: none; color: #888;
+      cursor: pointer; font-size: 11px; padding: 2px 6px;
+    }
+    .copy-btn:hover { color: #a78bfa; }
+    pre {
+      margin: 0; padding: 14px 16px;
+      background: #0d1117; color: #e6edf3;
+      font-size: 13px; font-family: monospace;
+      overflow-x: auto; line-height: 1.6;
+    }
+
+    /* thinking bubble */
+    .thinking { font-size: 13px; color: #888; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .dot { animation: blink 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* quick actions */
+    #quick-row {
+      display: flex; gap: 6px; padding: 6px 14px 0;
+      overflow-x: auto; flex-shrink: 0;
+    }
+    #quick-row::-webkit-scrollbar { display: none; }
+    .quick-btn {
+      background: #1e1e3a; border: 1px solid #2d2d5e;
+      border-radius: 16px; padding: 4px 12px;
+      color: #a78bfa; cursor: pointer; font-size: 12px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .quick-btn:hover { background: #2a2a50; }
+
+    /* input row */
+    #input-row {
+      display: flex; gap: 8px; padding: 10px 14px;
+      border-top: 1px solid #1e1e3a; background: #0f0f1a; flex-shrink: 0;
+    }
+    #msg-input {
+      flex: 1; background: #1e1e3a; border: 1px solid #2d2d5e;
+      border-radius: 8px; padding: 8px 12px;
+      color: #e2e8f0; font-size: 14px; outline: none; resize: none;
+      font-family: inherit; max-height: 100px; line-height: 1.5;
+    }
+    #msg-input:focus { border-color: #7F77DD; }
+    #send-btn {
+      background: #7F77DD; border: none; border-radius: 8px;
+      padding: 8px 18px; color: #fff; font-size: 14px;
+      font-weight: 500; cursor: pointer; align-self: flex-end;
+    }
+    #send-btn:hover { background: #6d65c8; }
+    #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── CODE EDITOR ── */
+    #editor-panel {
+      border-top: 1px solid #1e1e3a;
+      background: #0d1117;
+      display: none;
+      flex-direction: column;
+      height: 210px; flex-shrink: 0;
+    }
+    #editor-panel.open { display: flex; }
+    #editor-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 12px;
+      border-bottom: 1px solid #1e1e3a;
+      background: #111127; flex-shrink: 0;
+    }
+    #editor-header span { font-size: 12px; color: #888; }
+    #editor-actions { display: flex; gap: 8px; align-items: center; }
+    #run-btn {
+      background: #1D9E75; border: none; border-radius: 6px;
+      padding: 4px 12px; color: #fff; font-size: 12px;
+      font-weight: 500; cursor: pointer;
+    }
+    #run-btn:hover { background: #18876a; }
+    #close-editor {
+      background: none; border: none; color: #666;
+      cursor: pointer; font-size: 16px; line-height: 1;
+    }
+    #code-input {
+      flex: 1; background: #0d1117; color: #e6edf3;
+      border: none; padding: 10px 14px;
+      font-size: 13px; font-family: monospace;
+      resize: none; outline: none; line-height: 1.6;
+    }
+    #code-output {
+      padding: 6px 14px; font-size: 12px; font-family: monospace;
+      color: #7ee787; background: #0d1117;
+      border-top: 1px solid #1e1e3a;
+      min-height: 26px; max-height: 56px;
+      overflow-y: auto; flex-shrink: 0;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+<!-- API KEY MODAL -->
+<div id="key-modal">
+  <div class="modal-box">
+    <h2>🧠 PyML.tutor</h2>
+    <p>Enter your Anthropic API key to get started. Your key is stored only in your browser's <code>localStorage</code> — it is never sent anywhere except directly to Anthropic's API.<br><br>
+    Don't have a key? <a href="https://console.anthropic.com/" target="_blank">Get one at console.anthropic.com</a></p>
+    <input type="password" id="api-key-input" placeholder="sk-ant-..." />
+    <button id="save-key-btn">Start Learning</button>
+    <p class="modal-note">Your key stays in your browser. Never shared or logged.</p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div id="sidebar">
+    <div class="sidebar-section-label">Progress</div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="prog-fill" style="width:0%"></div></div>
+    <div class="progress-label" id="prog-label">0 / 23 modules · 0%</div>
+    <div id="module-list"></div>
+    <div class="sidebar-footer">
+      <button id="reset-btn">Reset progress</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="header">
+      <button id="toggle-sidebar">☰</button>
+      <span class="logo">PyML.tutor</span>
+      <span class="cur-mod" id="cur-mod-label"></span>
+      <button id="toggle-key">API key</button>
+      <button id="toggle-editor">code editor</button>
+    </div>
+
+    <div id="chat-area">
+      <div class="welcome" id="welcome-msg">
+        <div class="emoji">🧠</div>
+        <h3>Welcome to PyML.tutor</h3>
+        <p>Your personal AI/ML instructor — from Python basics to industry-level deep learning.<br>Type <b>"I'm ready"</b> to begin, or ask about the curriculum.</p>
+      </div>
+    </div>
+
+    <div id="quick-row">
+      <button class="quick-btn" data-msg="I'm ready">I'm ready</button>
+      <button class="quick-btn" data-msg="next">next</button>
+      <button class="quick-btn" data-msg="quiz me">quiz me</button>
+      <button class="quick-btn" data-msg="repeat">repeat</button>
+      <button class="quick-btn" data-msg="summary">summary</button>
+      <button class="quick-btn" data-msg="project">project</button>
+    </div>
+
+    <div id="input-row">
+      <textarea id="msg-input" rows="1" placeholder="Ask a question or type 'next'…"></textarea>
+      <button id="send-btn">Send</button>
+    </div>
+
+    <div id="editor-panel">
+      <div id="editor-header">
+        <span>Python playground</span>
+        <div id="editor-actions">
+          <button id="run-btn">▶ Run</button>
+          <button id="close-editor">✕</button>
+        </div>
+      </div>
+      <textarea id="code-input" spellcheck="false"># Practice your Python here!
+print('Hello, ML world!')</textarea>
+      <div id="code-output"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SYSTEM_PROMPT = `You are PyML.tutor, an expert AI/ML instructor teaching Python from absolute beginner to industry-level professional. You remember everything taught from the start of this conversation and maintain full curriculum continuity.
+
+CURRICULUM STRUCTURE (follow this exact order unless the user requests otherwise):
+
+PHASE 1 — Python & Data Science Foundations
+  Module 1: Python Basics — variables, types, operators, control flow, functions
+  Module 2: Data Structures — lists, dicts, sets, tuples, comprehensions, OOP
+  Module 3: NumPy & Pandas — arrays, DataFrames, slicing, aggregation, cleaning
+  Module 4: Visualization — Matplotlib, Seaborn, plotting for EDA
+
+PHASE 2 — Classical Machine Learning
+  Module 5: ML Fundamentals — supervised/unsupervised, bias-variance, train/test split
+  Module 6: Regression — linear, polynomial, ridge, lasso, gradient descent
+  Module 7: Classification — logistic regression, decision trees, random forests, SVMs
+  Module 8: Unsupervised Learning — k-means, DBSCAN, PCA, dimensionality reduction
+  Module 9: Scikit-Learn — pipelines, preprocessing, transformers, GridSearchCV
+  Module 10: Feature Engineering — encoding, scaling, selection, imbalanced data
+  Module 11: Model Evaluation — accuracy, F1, ROC/AUC, cross-validation, confusion matrix
+
+PHASE 3 — Deep Learning
+  Module 12: Neural Networks — perceptrons, activation functions, backpropagation
+  Module 13: TensorFlow & Keras — Sequential API, layers, training loops, callbacks
+  Module 14: PyTorch — tensors, autograd, nn.Module, DataLoader, training loop
+  Module 15: CNNs — convolution, pooling, transfer learning, image classification
+  Module 16: RNNs & LSTMs — sequences, vanishing gradients, time-series, text
+  Module 17: Transformers — attention mechanism, BERT architecture, positional encoding
+
+PHASE 4 — Advanced AI & Industry
+  Module 18: NLP & HuggingFace — tokenizers, pipelines, fine-tuning BERT/GPT
+  Module 19: Computer Vision — YOLO, segmentation, OpenCV, torchvision
+  Module 20: Reinforcement Learning — agents, rewards, Q-learning, policy gradients
+  Module 21: LLMs & Fine-Tuning — prompt engineering, LoRA, PEFT, RAG
+  Module 22: MLOps & Deployment — Docker, FastAPI, model serving, MLflow, monitoring
+  Module 23: Capstone Projects — end-to-end projects with real datasets
+
+TEACHING RULES:
+1. WAIT FOR "I'm ready" — Do not begin teaching until the user sends "I'm ready".
+2. ONE LESSON AT A TIME — Teach one focused concept per response.
+3. EVERY LESSON INCLUDES:
+   - Clear explanation in plain English
+   - A concrete Python code example (runnable, well-commented, in \`\`\`python blocks)
+   - A real-world ML/AI connection
+   - 1-2 practice challenges
+   - End with: "Type 'next' when ready to continue, or ask any question"
+4. MEMORY — Reference prior lessons. Connect concepts forward and backward.
+5. ADAPT — Slow down if needed, move fast if the learner is keeping up.
+6. QUIZZES — After every 3-4 lessons, offer a short 3-question quiz.
+7. CODE STYLE — Python 3.10+, PEP 8, heavily commented, shown in \`\`\`python blocks.
+8. INDUSTRY CONTEXT — Connect to real-world usage regularly.
+9. NAVIGATION — Respond to: "next", "repeat", "skip to [topic]", "quiz me", "project", "summary"
+10. TONE — Encouraging, precise, never condescending.
+
+START (when user says "I'm ready"):
+"Let's build your AI/ML career from the ground up.
+📍 Starting: Module 1 — Python Basics, Lesson 1: Variables & Data Types
+[deliver Lesson 1 in full format]"`;
+
+const CURRICULUM = [
+  { phase:1, label:"Phase 1 — Python & Data Science", color:"#7F77DD", modules:[
+    {id:1,name:"Python Basics"},{id:2,name:"Data Structures"},
+    {id:3,name:"NumPy & Pandas"},{id:4,name:"Visualization"},
+  ]},
+  { phase:2, label:"Phase 2 — Classical ML", color:"#1D9E75", modules:[
+    {id:5,name:"ML Fundamentals"},{id:6,name:"Regression"},
+    {id:7,name:"Classification"},{id:8,name:"Unsupervised Learning"},
+    {id:9,name:"Scikit-Learn"},{id:10,name:"Feature Engineering"},
+    {id:11,name:"Model Evaluation"},
+  ]},
+  { phase:3, label:"Phase 3 — Deep Learning", color:"#378ADD", modules:[
+    {id:12,name:"Neural Networks"},{id:13,name:"TensorFlow & Keras"},
+    {id:14,name:"PyTorch"},{id:15,name:"CNNs"},
+    {id:16,name:"RNNs & LSTMs"},{id:17,name:"Transformers"},
+  ]},
+  { phase:4, label:"Phase 4 — Advanced AI", color:"#D85A30", modules:[
+    {id:18,name:"NLP & HuggingFace"},{id:19,name:"Computer Vision"},
+    {id:20,name:"Reinforcement Learning"},{id:21,name:"LLMs & Fine-Tuning"},
+    {id:22,name:"MLOps & Deployment"},{id:23,name:"Capstone Projects"},
+  ]},
+];
+
+// ── STATE ──
+let apiKey = localStorage.getItem("pyml_api_key") || "";
+let messages = JSON.parse(localStorage.getItem("pyml_messages") || "[]");
+let completedModules = JSON.parse(localStorage.getItem("pyml_completed") || "[]");
+let currentModule = parseInt(localStorage.getItem("pyml_current") || "0") || null;
+let loading = false;
+
+// ── INIT ──
+if (apiKey) document.getElementById("key-modal").classList.add("hidden");
+
+renderSidebar();
+renderMessages();
+
+// ── API KEY ──
+document.getElementById("save-key-btn").addEventListener("click", () => {
+  const val = document.getElementById("api-key-input").value.trim();
+  if (!val.startsWith("sk-")) { alert("Please enter a valid Anthropic API key (starts with sk-ant-…)"); return; }
+  apiKey = val;
+  localStorage.setItem("pyml_api_key", apiKey);
+  document.getElementById("key-modal").classList.add("hidden");
+});
+document.getElementById("api-key-input").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("save-key-btn").click(); });
+
+document.getElementById("toggle-key").addEventListener("click", () => {
+  document.getElementById("api-key-input").value = apiKey;
+  document.getElementById("key-modal").classList.remove("hidden");
+});
+
+// ── SIDEBAR ──
+function renderSidebar() {
+  const list = document.getElementById("module-list");
+  list.innerHTML = "";
+  CURRICULUM.forEach(phase => {
+    const lbl = document.createElement("div");
+    lbl.className = "phase-label";
+    lbl.style.color = phase.color;
+    lbl.textContent = phase.label;
+    list.appendChild(lbl);
+    phase.modules.forEach(mod => {
+      const item = document.createElement("div");
+      item.className = "mod-item" + (currentModule===mod.id ? " active" : "") + (completedModules.includes(mod.id) ? " done" : "");
+      item.style.borderLeftColor = (currentModule===mod.id) ? phase.color : "transparent";
+      const dot = document.createElement("div");
+      dot.className = "mod-dot";
+      dot.style.borderColor = (completedModules.includes(mod.id) || currentModule===mod.id) ? phase.color : "#2d2d5e";
+      dot.style.background = completedModules.includes(mod.id) ? phase.color : currentModule===mod.id ? phase.color+"22" : "#1e1e3a";
+      dot.style.color = completedModules.includes(mod.id) ? "#fff" : phase.color;
+      dot.textContent = completedModules.includes(mod.id) ? "✓" : mod.id;
+      const name = document.createElement("span");
+      name.className = "mod-name";
+      name.textContent = mod.name;
+      item.appendChild(dot); item.appendChild(name);
+      item.addEventListener("click", () => sendMsg("skip to module " + mod.id));
+      list.appendChild(item);
+    });
+  });
+  const pct = Math.round(completedModules.length / 23 * 100);
+  document.getElementById("prog-fill").style.width = pct + "%";
+  document.getElementById("prog-label").textContent = completedModules.length + " / 23 modules · " + pct + "%";
+  const cm = document.getElementById("cur-mod-label");
+  cm.textContent = currentModule ? "· Module " + currentModule : "";
+}
+
+document.getElementById("toggle-sidebar").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.toggle("collapsed");
+});
+
+document.getElementById("reset-btn").addEventListener("click", () => {
+  if (!confirm("Reset all progress and chat history?")) return;
+  messages = []; completedModules = []; currentModule = null;
+  localStorage.removeItem("pyml_messages");
+  localStorage.removeItem("pyml_completed");
+  localStorage.removeItem("pyml_current");
+  renderSidebar(); renderMessages();
+});
+
+// ── MESSAGES ──
+function renderMessages() {
+  const area = document.getElementById("chat-area");
+  const welcome = document.getElementById("welcome-msg");
+  if (messages.length > 0) {
+    welcome.style.display = "none";
+    area.innerHTML = "";
+    messages.forEach(m => appendBubble(m.role, m.content, false));
+  } else {
+    welcome.style.display = "block";
+  }
+  area.scrollTop = area.scrollHeight;
+}
+
+function appendBubble(role, content, scroll=true) {
+  const welcome = document.getElementById("welcome-msg");
+  welcome.style.display = "none";
+  const area = document.getElementById("chat-area");
+  const wrap = document.createElement("div");
+  wrap.className = "msg-wrap " + role;
+  const lbl = document.createElement("div");
+  lbl.className = "msg-label";
+  lbl.textContent = role === "user" ? "you" : "PyML.tutor";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble " + role;
+  bubble.innerHTML = parseContent(content);
+  bubble.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const code = btn.closest(".code-block").querySelector("pre code").textContent;
+      navigator.clipboard.writeText(code).then(() => { btn.textContent = "copied!"; setTimeout(() => btn.textContent = "copy", 1500); });
+    });
+  });
+  wrap.appendChild(lbl); wrap.appendChild(bubble);
+  area.appendChild(wrap);
+  if (scroll) area.scrollTop = area.scrollHeight;
+}
+
+function parseContent(text) {
+  let html = "";
+  const parts = text.split(/(```[\w]*\n[\s\S]*?```)/g);
+  parts.forEach(part => {
+    const m = part.match(/```(\w+)?\n([\s\S]*?)```/);
+    if (m) {
+      const lang = m[1] || "python";
+      const code = m[2].replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      html += `<div class="code-block"><div class="code-header"><span class="code-lang">${lang}</span><button class="copy-btn">copy</button></div><pre><code>${code}</code></pre></div>`;
+    } else {
+      html += part.replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+    }
+  });
+  return html;
+}
+
+// ── SEND ──
+async function sendMsg(text) {
+  if (!apiKey) { document.getElementById("key-modal").classList.remove("hidden"); return; }
+  const txt = (text || document.getElementById("msg-input").value).trim();
+  if (!txt || loading) return;
+  document.getElementById("msg-input").value = "";
+  messages.push({ role: "user", content: txt });
+  appendBubble("user", txt);
+  loading = true;
+  document.getElementById("send-btn").disabled = true;
+
+  // thinking indicator
+  const area = document.getElementById("chat-area");
+  const thinking = document.createElement("div");
+  thinking.className = "msg-wrap assistant";
+  thinking.innerHTML = `<div class="msg-label">PyML.tutor</div><div class="bubble assistant thinking">thinking<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>`;
+  area.appendChild(thinking);
+  area.scrollTop = area.scrollHeight;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-client-side-api-key-flag": "true"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1500,
+        system: SYSTEM_PROMPT,
+        messages: messages
+      })
+    });
+    const data = await res.json();
+    thinking.remove();
+
+    if (data.error) {
+      const errMsg = "API error: " + (data.error.message || JSON.stringify(data.error));
+      messages.push({ role:"assistant", content: errMsg });
+      appendBubble("assistant", errMsg);
+    } else {
+      const reply = data.content?.[0]?.text || "No response received.";
+      messages.push({ role:"assistant", content: reply });
+      appendBubble("assistant", reply);
+      // detect module progress
+      const modMatch = reply.match(/Module\s+(\d+)/i);
+      if (modMatch) {
+        const m = parseInt(modMatch[1]);
+        if (currentModule && currentModule < m && !completedModules.includes(currentModule)) {
+          completedModules.push(currentModule);
+          localStorage.setItem("pyml_completed", JSON.stringify(completedModules));
+        }
+        currentModule = m;
+        localStorage.setItem("pyml_current", m);
+        renderSidebar();
+      }
+      localStorage.setItem("pyml_messages", JSON.stringify(messages.slice(-40)));
+    }
+  } catch (err) {
+    thinking.remove();
+    const errMsg = "Connection error: " + err.message;
+    messages.push({ role:"assistant", content: errMsg });
+    appendBubble("assistant", errMsg);
+  }
+  loading = false;
+  document.getElementById("send-btn").disabled = false;
+  area.scrollTop = area.scrollHeight;
+}
+
+document.getElementById("send-btn").addEventListener("click", () => sendMsg());
+document.getElementById("msg-input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+document.querySelectorAll(".quick-btn").forEach(btn => {
+  btn.addEventListener("click", () => sendMsg(btn.dataset.msg));
+});
+
+// ── CODE EDITOR ──
+const editorPanel = document.getElementById("editor-panel");
+document.getElementById("toggle-editor").addEventListener("click", () => {
+  const open = editorPanel.classList.toggle("open");
+  document.getElementById("toggle-editor").classList.toggle("active", open);
+  document.getElementById("toggle-editor").textContent = open ? "hide editor" : "code editor";
+});
+document.getElementById("close-editor").addEventListener("click", () => {
+  editorPanel.classList.remove("open");
+  document.getElementById("toggle-editor").classList.remove("active");
+  document.getElementById("toggle-editor").textContent = "code editor";
+});
+document.getElementById("run-btn").addEventListener("click", () => {
+  const code = document.getElementById("code-input").value;
+  const outEl = document.getElementById("code-output");
+  const logs = [];
+  try {
+    const fn = new Function("console", "print", code);
+    fn(
+      { log: (...a) => logs.push(a.map(String).join(" ")), error: (...a) => logs.push("Error: " + a.join(" ")) },
+      (...a) => logs.push(a.map(String).join(" "))
+    );
+    outEl.style.color = "#7ee787";
+    outEl.textContent = logs.join("\n") || "(no output)";
+  } catch(e) {
+    outEl.style.color = "#f87171";
+    outEl.textContent = "Error: " + e.message;
+  }
+});
+</script>
+</body>
+</html>
